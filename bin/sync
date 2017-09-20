@@ -1,0 +1,94 @@
+#!/usr/bin/env php
+<?php namespace DbSync\Command;
+
+$packageAutoloaders = array(
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+    __DIR__ . '/../../autoload.php',
+);
+foreach($packageAutoloaders as $autoloader)
+{
+    if(is_file($autoloader))
+    {
+        include $autoloader;
+    }
+}
+
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\DescriptorHelper;
+use Symfony\Component\Console\Helper\FormatterHelper;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Debug\ErrorHandler;
+ErrorHandler::register();
+
+class App {
+
+    private $descriptor;
+
+    private $formatter;
+
+    private $output;
+
+    public function __construct()
+    {
+        $this->descriptor = new DescriptorHelper();
+        $this->formatter = new FormatterHelper();
+        $this->output = new ConsoleOutput();
+    }
+
+    private function showUsage(Command $command)
+    {
+        $this->output->writeln("");
+        $this->output->writeln($command->getDescription());
+        $this->output->writeln("");
+        $this->descriptor->describe($this->output, $command->getDefinition());
+        $this->output->writeln("");
+    }
+
+    public function run(Command $command)
+    {
+        $input = new ArgvInput();
+
+        $input->bind($command->getDefinition());
+
+        if($input->hasOption('help') && $input->getOption('help'))
+        {
+            $this->showUsage($command);
+
+            return 0;
+        }
+
+        try
+        {
+            $input->validate();
+        }catch (\Exception $e)
+        {
+            $this->output->writeln($this->formatter->formatBlock($e->getMessage(), 'error', true));
+
+            $this->showUsage($command);
+
+            return 1;
+        }
+
+        try
+        {
+            $command->run(new ArgvInput(), $this->output);
+        }
+        catch (\Exception $e)
+        {
+            $this->output->writeln($e->getMessage());
+
+            $this->output->writeln($e->getTraceAsString());
+
+            return 1;
+        }
+
+        return 0;
+    }
+
+}
+
+$code = (new App())->run(new SyncCommand());
+
+exit(intval($code));
